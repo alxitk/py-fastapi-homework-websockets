@@ -24,7 +24,12 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
         Returns:
             None
         """
-        # Write your code here
+        self.active_connections.setdefault(user_data.user_id, []).append(websocket)
+        if len(self.active_connections[user_data.user_id]) == 1:
+            await self._broadcast(
+                {"event": "user_connected", "user": user_data.model_dump(mode="json")},
+                exclude=user_data.user_id
+            )
 
     async def disconnect(self, user_id: int, websocket: WebSocket) -> None:
         """
@@ -38,7 +43,18 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
         Returns:
             None
         """
-        # Write your code here
+        connections = self.active_connections.get(user_id)
+        if not connections or websocket not in connections:
+            return
+        connections.remove(websocket)
+        if len(connections) == 0:
+            del self.active_connections[user_id]
+            await self._broadcast(
+                {
+                    "event": "user_disconnected",
+                    "user_id": user_id
+                }
+            )
 
     async def _broadcast(self, message: dict, exclude: int = None) -> None:
         """
@@ -51,7 +67,11 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
         Returns:
             None
         """
-        # Write your code here
+        for user_id, socket_list in self.active_connections.items():
+            if user_id == exclude:
+                continue
+            for socket in socket_list:
+                await socket.send_json(message)
 
     async def send_personal_message(self, message: dict, user_id: int) -> None:
         """
@@ -64,4 +84,6 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
         Returns:
             None
         """
-        # Write your code here
+        active_connections = self.active_connections.get(user_id, [])
+        for conn in active_connections:
+            await conn.send_json(message)
