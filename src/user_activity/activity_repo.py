@@ -1,5 +1,6 @@
 from typing import List
 
+from pymongo import ReturnDocument
 from pymongo.asynchronous.database import AsyncDatabase
 
 from schemas.user_activity import UserBaseDTO, UpdateUserActivitySchema, UserActivitySchema
@@ -56,14 +57,12 @@ class UserActivityRepository(UserActivityRepoInterface):
         """
         fields = user_data.model_dump(exclude_none=True)
         collection = self.db["user_activity"]
-        await collection.update_one(
+        doc = await collection.find_one_and_update(
             {"user_id": user_data.user_id},
             {"$set": fields},
-            upsert=True
-        )
-        doc = await collection.find_one(
-            {"user_id": user_data.user_id},
-            {"_id": 0}
+            projection={"_id": 0},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
         )
         return UserActivitySchema(
             **doc

@@ -1,5 +1,5 @@
-from fastapi import WebSocket
-from typing import Dict, List
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import Dict, List, Optional
 
 from schemas.user_activity import UserActivitySchema
 from user_activity.interfaces import UserActivityWebSocketManagerInterface
@@ -56,7 +56,10 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
                 }
             )
 
-    async def _broadcast(self, message: dict, exclude: int = None) -> None:
+    async def _broadcast(
+            self, message: dict,
+            exclude: Optional[int] = None
+    ) -> None:
         """
         Send a message to all connected users, optionally skipping one user.
 
@@ -67,11 +70,14 @@ class UserActivityWebSocketManager(UserActivityWebSocketManagerInterface):
         Returns:
             None
         """
-        for user_id, socket_list in self.active_connections.items():
+        for user_id, socket_list in list(self.active_connections.items()):
             if user_id == exclude:
                 continue
-            for socket in socket_list:
-                await socket.send_json(message)
+            for socket in list(socket_list):
+                try:
+                    await socket.send_json(message)
+                except (WebSocketDisconnect, RuntimeError):
+                    continue
 
     async def send_personal_message(self, message: dict, user_id: int) -> None:
         """

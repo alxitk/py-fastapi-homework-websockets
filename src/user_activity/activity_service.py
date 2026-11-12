@@ -89,6 +89,8 @@ class UserActivityService(UserActivityServiceInterface):
             while True:
                 await websocket.receive_json()
         except WebSocketDisconnect:
+            pass
+        finally:
             await self.activity_ws_manager.disconnect(user_id, websocket)
             await self.activity_repo.update_user_activity(
                 UpdateUserActivitySchema(
